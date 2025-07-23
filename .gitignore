@@ -1,0 +1,24 @@
+# Ignore frontend & backend node_modules and env files
+client/node_modules/
+client/.env
+
+server/node_modules/
+server/.env
+
+# Optional if you build static assets
+client/build/
+client/dist/
+server/dist/
+
+# Logs and OS
+*.log
+.DS_Store
+Thumbs.db
+
+# IDEs/editors
+.vscode/
+.idea/
+
+
+
+
