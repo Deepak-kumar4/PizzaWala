@@ -1,62 +1,91 @@
 const User = require("../models/user.model");
-const bcrypt = require("bcryptjs");
-const jwt = require("jsonwebtoken");
+const { hashPassword, comparePassword } = require("../utils/hash.util");
+const { generateToken } = require("../utils/token.util");
 
-// Register user
+// Register new user
 exports.register = async (req, res) => {
-  const { email, password } = req.body;
-
   try {
+    const { email, password, role = "user" } = req.body; // default role to "user"
+
+    if (!email || !password) {
+      return res.status(400).json({ message: "Email and Password are required" });
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ message: "Invalid email format" });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({ message: "Password must be at least 6 characters" });
+    }
+
     const existing = await User.findOne({ email });
-    if (existing) return res.status(409).json({ msg: "User already exists" });
+    if (existing) {
+      return res.status(400).json({ message: "Email already exists" });
+    }
 
-    const hash = await bcrypt.hash(password, 10);
-    await User.create({ email, password: hash });
+    const hashedPassword = await hashPassword(password);
 
-    res.status(201).json({ msg: "User registered" });
+    const newUser = await User.create({ email, password: hashedPassword, role });
+
+    const token = generateToken({ id: newUser._id, role: newUser.role });
+
+    res.cookie("token", token, { httpOnly: true });
+    res.status(201).json({ message: "Registered successfully" });
   } catch (err) {
-    res.status(500).json({ msg: "Register error", error: err.message });
+    res.status(500).json({ message: "Server error during registration" });
   }
 };
 
-// Login user and set cookie
+// Login user
 exports.login = async (req, res) => {
-  const { email, password } = req.body;
-
   try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ message: "Email and Password required" });
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ message: "Invalid email format" });
+    }
+
     const user = await User.findOne({ email });
-    if (!user) return res.status(404).json({ msg: "Invalid Credentials" });
+    if (!user) {
+      return res.status(400).json({ message: "Invalid credentials" });
+    }
 
-    const match = await bcrypt.compare(password, user.password);
-    if (!match) return res.status(401).json({ msg: "Incorrect password" });
+    const isMatch = await comparePassword(password, user.password);
+    if (!isMatch) {
+      return res.status(400).json({ message: "Invalid credentials" });
+    }
 
-    const token = jwt.sign(
-      { id: user._id, email: user.email },
-      process.env.JWT_SECRET,
-      {
-        expiresIn: "1h",
-      }
-    );
+    const token = generateToken({ id: user._id, role: user.role });
 
-    res.cookie("token", token, {
+    res.cookie("token", token, { httpOnly: true });
+    res.json({ message: "Login successful" });
+  } catch (err) {
+    res.status(500).json({ message: "Server error during login" });
+  }
+};
+
+// Logout user
+exports.logout = async (req, res) => {
+  try {
+    res.clearCookie("token", {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "Lax", 
-      path: "/",
-      maxAge: 60 * 60 * 1000, // 1 hour
+      sameSite: "Strict",
     });
 
-    res.json({ msg: "Login successful" });
+    res.status(200).json({ message: "Logout successful" });
   } catch (err) {
-    res.status(500).json({ msg: "Login error", error: err.message });
+    res.status(500).json({ message: "Server error during logout" });
   }
 };
 
-exports.logout = (req, res) => {
-  res.clearCookie("token", {
-    httpOnly: true,
-    sameSite: "Lax", // Or "None" if using cross-site
-    secure: process.env.NODE_ENV === "production", // Secure in prod
-  });
-  res.json({ msg: "Logged out successfully" });
-};
+
+
+

@@ -1,33 +1,19 @@
-const express=require("express");
-const Pizza = require("../models/pizza.model")
-const router=express.Router();
+const express = require("express");
+const router = express.Router();
+const { getAllPizzas, createPizza, getPizzaById } = require("../controllers/pizza.controller");
+const { verifyToken } = require("../middlewares/auth.middleware");
+const { isAdmin } = require("../middlewares/isAdmin.middleware");
 
+// Public route - anyone can view pizzas
+router.get("/", getAllPizzas);
 
-// GET  /api/pizzas
+// Get single pizza by ID
+router.get("/:id", getPizzaById);
 
-router.get("/",async function(req,res){
-    try{
-        const pizzas= await Pizza.find();
-        res.json(pizzas);
-
-    }catch(err){
-        res.status(500).json({msf:"Failed to load pizzas"})
-
-    }
-});
-
-router.post("/", async function(req,res){
-    try{
-        const newPizza= new Pizza(req.body);
-        await newPizza.save();
-        res.status(201).json({msg:"Pizza Created",pizza:newPizza})
-
-
-    }
-    catch{
-        res.status(400).json({msg:"Failed to create pizza"})
-
-    }
-})
+// Admin-only route - only logged-in admins can create pizzas
+router.post("/", verifyToken, isAdmin, createPizza);
 
 module.exports = router;
+
+
+
