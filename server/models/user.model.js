@@ -2,21 +2,10 @@ const mongoose = require("mongoose");
 
 const cartItemSchema = new mongoose.Schema(
   {
-    _id: {
-      type: mongoose.Schema.Types.ObjectId, // Refers to Pizza ID or Menu Item ID
-      required: [true, "Product ID is required"],
-    },
-    name: {
-      type: String,
-      required: [true, "Product name is required"],
-      trim: true,
-      minlength: [2, "Name must be at least 2 characters long"],
-      maxlength: [100, "Name is too long"],
-    },
-    price: {
-      type: Number,
-      required: [true, "Price is required"],
-      min: [0, "Price cannot be negative"],
+    pizza: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Pizza",
+      required: true,
     },
     quantity: {
       type: Number,

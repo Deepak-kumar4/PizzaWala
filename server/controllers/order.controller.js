@@ -9,13 +9,12 @@ exports.createOrder = async (req, res) => {
     const { items, totalPrice, razorpay_order_id } = req.body;
     const fromUserId = req.user.id;
 
-    // Validation*
     if (!fromUserId || !items || !Array.isArray(items) || items.length === 0 || !totalPrice) {
       return res.status(400).json({ message: "Missing or invalid order data" });
     }
 
     const orderItems = [];
-    let adminUser = await User.findOne({ role: "admin" }); // default admin
+    let adminUser = await User.findOne({ role: "admin" });
     if (!adminUser) return res.status(500).json({ message: "No admin found" });
 
     for (const item of items) {
@@ -36,9 +35,6 @@ exports.createOrder = async (req, res) => {
         price: pizza.price,
         quantity,
       });
-
-      // If you later add `pizza.createdBy`, you can use that instead of this static admin
-      // const adminUser = await User.findById(pizza.createdBy);
     }
 
     const newOrder = await Order.create({
@@ -50,12 +46,20 @@ exports.createOrder = async (req, res) => {
       status: "Pending",
     });
 
-    res.status(201).json({ message: "Order created", order: newOrder });
+    // ✅ After creating the order, fetch all user's orders
+    const userOrders = await Order.find({ fromUserId }).sort({ createdAt: -1 });
+
+    res.status(201).json({
+      message: "Order created successfully",
+      newOrder,
+      allOrders: userOrders,
+    });
   } catch (err) {
     console.error("Order creation error:", err);
     res.status(500).json({ message: "Server error while creating order" });
   }
 };
+
 
 // Get all orders for the logged-in user
 exports.getUserOrders = async (req, res) => {
@@ -73,34 +77,68 @@ exports.getUserOrders = async (req, res) => {
 
 // Admin update order status
 exports.updateOrderStatus = async (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body;
+
+  if (!["Pending", "Accepted", "Rejected"].includes(status)) {
+    return res.status(400).json({ message: "Invalid status value." });
+  }
+
+  const order = await Order.findById(id);
+  if (!order) return res.status(404).json({ message: "Order not found" });
+
+  order.status = status;
+  await order.save();
+
+  res.json({ message: "Order status updated", order });
+};
+
+
+// Admin get all orders
+exports.getAllOrders = async (req, res) => {
   try {
-    const { id } = req.params;
-    const { status } = req.body;
+    const orders = await Order.find()
+      .sort({ createdAt: -1 })
+      .populate("fromUserId", "name email")
+      .populate("items.pizzaId", "name image price");
 
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({ message: "Invalid order ID format" });
-    }
+    const formattedOrders = orders.map((order) => ({
+      _id: order._id,
+      user: order.fromUserId,
+      status: order.status,
+      total: order.totalPrice,
+      items: order.items.map((item) => ({
+        pizza: item.pizzaId,
+        quantity: item.quantity,
+      })),
+    }));
 
-    const allowedStatus = ["Pending", "Paid", "Delivered"];
-    if (!allowedStatus.includes(status)) {
-      return res.status(400).json({ message: "Invalid status value" });
-    }
-
-    const updatedOrder = await Order.findByIdAndUpdate(
-      id,
-      { status },
-      { new: true }
-    );
-
-    if (!updatedOrder) {
-      return res.status(404).json({ message: "Order not found" });
-    }
-
-    res.json({ message: "Order status updated", order: updatedOrder });
-  } catch (err) {
-    console.error("Order status update error:", err);
-    res.status(500).json({ message: "Server error while updating order" });
+    res.status(200).json({ orders: formattedOrders });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch orders" });
   }
 };
+
+exports.getOrdersForAdmin = async (req, res) => {
+  try {
+    const adminId = req.user.id;
+
+    // Step 1: Find all pizza IDs created by this admin
+    const pizzas = await Pizza.find({ createdBy: adminId }).select("_id");
+    const pizzaIds = pizzas.map(p => p._id);
+
+    // Step 2: Find orders containing those pizzas
+    const orders = await Order.find({ "items.pizza": { $in: pizzaIds } })
+      .populate("user", "email")
+      .populate("items.pizza", "name price");
+
+    res.json({ orders });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Failed to fetch admin's orders." });
+  }
+};
+
+
 
 

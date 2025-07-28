@@ -15,3 +15,13 @@ exports.getMenu = async (req, res) => {
     res.status(500).json({ message: "Error fetching menu", error: err.message });
   }
 };
+
+exports.getPizzaById = async (req, res) => {
+  try {
+    const pizza = await Pizza.findById(req.params.id);
+    if (!pizza) return res.status(404).json({ message: "Pizza not found" });
+    res.json(pizza);
+  } catch (err) {
+    res.status(500).json({ message: "Error fetching pizza details" });
+  }
+};

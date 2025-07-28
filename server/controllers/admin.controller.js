@@ -55,7 +55,7 @@ const deletePizza = async (req, res) => {
 
 // ✅ Admin Dashboard Stats
 const getAdminStats = async (req, res) => {
- try {
+  try {
     const pizzasCount = await Pizza.countDocuments();
     const ordersCount = await Order.countDocuments();
     const usersCount = await User.countDocuments();
@@ -71,13 +71,60 @@ const getAdminStats = async (req, res) => {
   }
 };
 
+// ✅ Promote or Demote User Role
+const updateUserRole = async (req, res) => {
+  try {
+    const { role } = req.body;
+    if (!["user", "admin"].includes(role)) {
+      return res.status(400).json({ message: "Invalid role" });
+    }
+
+    const user = await User.findByIdAndUpdate(
+      req.params.id,
+      { role },
+      { new: true, runValidators: true }
+    );
+
+    if (!user) return res.status(404).json({ message: "User not found" });
+    res.json({ message: "User role updated successfully", user });
+  } catch (error) {
+    console.error("Error updating user role:", error);
+    res.status(500).json({ message: "Failed to update user role" });
+  }
+};
+
+// ✅ Delete User
+const deleteUser = async (req, res) => {
+  try {
+    const user = await User.findByIdAndDelete(req.params.id);
+    if (!user) return res.status(404).json({ message: "User not found" });
+    res.json({ message: "User deleted successfully", user });
+  } catch (error) {
+    console.error("Error deleting user:", error);
+    res.status(500).json({ message: "Failed to delete user" });
+  }
+};
+
+const getAllAdminPizzas = async (req, res) => {
+  try {
+    const pizzas = await Pizza.find();
+    res.status(200).json({ pizzas });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch pizzas" });
+  }
+};
+
 module.exports = {
   getAllUsers,
   updatePizza,
   deletePizza,
   getPizzaById,
-  getAdminStats
+  getAdminStats,
+  updateUserRole,
+  deleteUser,
+  getAllAdminPizzas,
 };
+
 
 
 

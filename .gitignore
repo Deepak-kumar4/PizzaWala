@@ -7,7 +7,7 @@ server/.env
 
 # Optional if you build static assets
 client/build/
-# client/dist/
+client/dist/
 server/dist/
 
 # Logs and OS

@@ -1,33 +1,41 @@
 const User = require("../models/user.model");
 
-// Get current user's cart
+// getCart
 exports.getCart = async (req, res) => {
   try {
-    const user = await User.findById(req.user.id);
-    if (!user) return res.status(404).json({ message: "User not found" });
+    const user = await User.findById(req.user.id).populate("cart.pizza");
+    if (!user) return res.status(404).json({ error: "User not found" });
 
-    res.json({ cart: user.cart || [] });
-  } catch (err) {
-    console.error("GET /cart error:", err);
-    res.status(500).json({ message: "Server error" });
+    res.json({ cart: user.cart });
+  } catch (error) {
+    console.error("Error fetching cart:", error);
+    res.status(500).json({ error: "Failed to fetch cart" });
   }
 };
 
-// Update user's cart
+// updateCart
 exports.updateCart = async (req, res) => {
-  try {
-    const { cart } = req.body;
+  const userId = req.user?.id;
+  const { cart } = req.body;
 
-    const user = await User.findByIdAndUpdate(
-      req.user.id,
+  try {
+    if (!userId) {
+      return res.status(401).json({ error: "User not authenticated" });
+    }
+
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
       { cart },
       { new: true }
-    );
+    ).populate("cart.pizza");
 
-    if (!user) return res.status(404).json({ message: "User not found" });
-    res.json({ message: "Cart updated" });
-  } catch (err) {
-    console.error("PUT /cart error:", err);
-    res.status(500).json({ message: "Server error" });
+    if (!updatedUser) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    res.json({ cart: updatedUser.cart });
+  } catch (error) {
+    console.error("Error updating cart:", error);
+    res.status(500).json({ error: "Failed to update cart" });
   }
 };
